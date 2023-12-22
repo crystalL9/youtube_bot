@@ -29,5 +29,12 @@ console_handler.setFormatter(formatter)
 # Thêm StreamHandler vào logger
 logger.addHandler(console_handler)
 
-# Ghi thông tin log
-logger.debug('Đây là một thông tin log.')
+def log_green(txt):
+    logger.info(txt)
+def log_yellow(txt):
+    logger.warning(txt)
+def log_red(txt):
+    logger.error(txt)
+def log_white(txt):
+    logger.critical(txt)
+

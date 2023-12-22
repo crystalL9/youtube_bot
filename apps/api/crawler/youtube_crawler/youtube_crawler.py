@@ -10,36 +10,9 @@ from .utils import (
     GChromeDriver
 )
 from call_api import get_links,insert
-import logging
-from colorlog import ColoredFormatter
-
-# Tạo logger và cấu hình logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# Tạo một StreamHandler để đẩy log message đến stdout
-console_handler = logging.StreamHandler()
-
-# Sử dụng ColoredFormatter để có log màu trên màn hình
-formatter = ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    reset=True,
-    log_colors={
-        'DEBUG': 'white',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'white',
-    },
-    secondary_log_colors={},
-    style='%'
-)
-
-console_handler.setFormatter(formatter)
+from logger import *
 
 
-logger.addHandler(console_handler)
 YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com"
 BROWSER_LANGUAGE = "en"
 HASHTAG_SEARCH_URL = "https://www.youtube.com/hashtag"
@@ -61,10 +34,10 @@ class YoutubeCrawlerTool:
     def get_link_search_key_word(self,sub_key_list,main_key_list,queue_link,max_size_post):
         while True:
             # lấy link đã crawl từ file local
-            #crawled_video_links = self.read_file_lines('link_crawled/crawled.txt')
+            crawled_video_links = self.read_file_lines('link_crawled/crawled.txt')
 
             # lấy link đã crawl từ db
-            crawled_video_links=get_links("youtube_video","crawled")['links']
+            #crawled_video_links=get_links("youtube_video","crawled")['links']
             if sub_key_list!=None:
                 for mainkey in main_key_list:
                     for subkey in sub_key_list:
@@ -76,7 +49,7 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                logger.critical("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                log_white("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                 self.driver.get('about:blank')
                 time.sleep(3600*2)    
 
@@ -91,7 +64,7 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                    logger.critical("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                    log_white("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                     self.driver.get('about:blank')
                     time.sleep(3600*1)
             
@@ -102,10 +75,10 @@ class YoutubeCrawlerTool:
                 id_channel=link_channel.split('/')[-1]
                 try:
                     # lấy link đã crawl từ file local
-                    #crawled_video_links = self.read_file_lines(f'link_crawled/{id_channel}.txt')
+                    crawled_video_links = self.read_file_lines(f'link_crawled/{id_channel}.txt')
 
                     # lấy link đã crawl từ db
-                    crawled_video_links=get_links('youtube_video',id_channel)['links']
+                    #crawled_video_links=get_links('youtube_video',id_channel)['links']
                 except:
                     crawled_video_links = []
 
@@ -129,7 +102,7 @@ class YoutubeCrawlerTool:
                     time.sleep(3)
                 except:
                     pass
-            logger.critical("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
+            log_white("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
             self.driver.get('about:blank')
             time.sleep(3600*1)
 
@@ -416,14 +389,17 @@ class YoutubeCrawlerTool:
             video_title_elements = self.driver.find_elements(By.XPATH, '//*[@id="thumbnail"]/ytd-thumbnail/a')
             for element in video_title_elements:
                 link= self.excute_link(element.get_attribute("href"))
-                id=self.link_to_id(link)
-                if id in id_video:
-                    pass
-                elif id in crawled_link:
-                        return video_links
+                if 'shorts' in str(link):
+                    continue
                 else:
-                        id_video.append(id)
-                        video_links.append(link)
+                    id=self.link_to_id(link)
+                    if id in id_video:
+                        pass
+                    elif id in crawled_link:
+                            return video_links
+                    else:
+                            id_video.append(id)
+                            video_links.append(link)
                         
             if after_scroll_height == before_scroll_height:
                 return video_links

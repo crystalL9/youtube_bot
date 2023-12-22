@@ -21,36 +21,7 @@ from .result import Post
 from jsonpath_ng import parse
 from selenium.webdriver.support.ui import WebDriverWait
 from call_api import get_links,insert
-import logging
-from colorlog import ColoredFormatter
-
-# Tạo logger và cấu hình logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# Tạo một StreamHandler để đẩy log message đến stdout
-console_handler = logging.StreamHandler()
-
-# Sử dụng ColoredFormatter để có log màu trên màn hình
-formatter = ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    reset=True,
-    log_colors={
-        'DEBUG': 'white',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'white',
-    },
-    secondary_log_colors={},
-    style='%'
-)
-
-console_handler.setFormatter(formatter)
-
-# Thêm StreamHandler vào logger
-logger.addHandler(console_handler)
+from logger import *
 
 YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com"
 LOGIN_URL = (
@@ -522,12 +493,12 @@ class DetailCrawler:
     #mode 2: channel
 
     def run(self, video_url, main_key, sub_key,mode):
-            logger.warning(f"»» Bắt đầu crawl link : {video_url}")
+            log_yellow(f"»» Bắt đầu crawl link : {video_url}")
             time.sleep(2)
             try:
                 self.driver.get(video_url)
                 time.sleep(4)
-                logger.warning(f"»»»»»» Crawl thông tin video có link là {video_url}")
+                log_yellow(f"»»»»»» Crawl thông tin video có link là {video_url}")
                 video_info=self.extract_video_info_json(main_key= main_key, sub_key=sub_key,mode=mode)
                 if video_info is None:
                     return None,[]
@@ -548,7 +519,7 @@ class DetailCrawler:
                         file.write(f'{self.link_to_id(video_url)}\n')
 
                     # lưu link vào db
-                    insert('youtube_video','crawled',self.link_to_id(video_url))
+                    #insert('youtube_video','crawled',self.link_to_id(video_url))
 
                 if mode==2:
                     # lưu link vào local
@@ -556,7 +527,7 @@ class DetailCrawler:
                         file.write(f'{self.link_to_id(video_url)}\n')
                     
                     # lưu link vào db
-                    insert('youtube_video',str(video_info.author_link).split("/")[-1],self.link_to_id(video_url))
+                    #insert('youtube_video',str(video_info.author_link).split("/")[-1],self.link_to_id(video_url))
 
                 self.driver.get('about:blank')
                 return video_info, comments
@@ -601,7 +572,7 @@ class DetailCrawler:
             if after_scroll_height == before_scroll_height:
                 break
     def get_comments_from_url(self,youtube_url,mode):
-        logger.warning(f'»»»»»» Crawl bình luận của video có link là {youtube_url}')
+        log_yellow(f'»»»»»» Crawl bình luận của video có link là {youtube_url}')
         link = self.driver.current_url
         video_id = self.extract_video_id(link)
         sort_by=SORT_BY_RECENT 
@@ -697,7 +668,7 @@ class DetailCrawler:
                 yield result
                 comments_data.append(result)
             if len(comments_data)>0:
-                logger.info(f"⨝ Crawl được {len(comments_data)} bình luận")
+                log_green(f"⨝ Crawl được {len(comments_data)} bình luận")
                 for comment in comments_data:
                     if int(mode)==3:
                         push_kafka_update(posts=[Post(**comment)],comments=None)
@@ -934,7 +905,7 @@ class GChromeDriver:
                 break  # Thoát khỏi vòng lặp nếu tìm thấy trường mật khẩu
             except TimeoutException:
                 attempts += 1
-                logger.error("Không tìm thấy trường mật khẩu. Refresh lại trang...")
+                log_red("Không tìm thấy trường mật khẩu. Refresh lại trang...")
                 driver.refresh()
         
         if password_field:
@@ -946,7 +917,7 @@ class GChromeDriver:
             password_next_button.click()
             time.sleep(5)
         else:
-            logger.error("Không thể đăng nhập sau số lần thử tối đa.")
+            log_red("Không thể đăng nhập sau số lần thử tối đa.")
 
     @classmethod
     def captcha_handle(cls, driver):
