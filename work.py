@@ -6,6 +6,36 @@ from apps.api.crawler.youtube_crawler.youtube_crawler import YoutubeCrawlerTool
 from apps.api.crawler.youtube_crawler.youtube_crawler import YoutubeCrawlerJob
 from elasticsearch import Elasticsearch
 from datetime import datetime, timedelta
+import logging
+from colorlog import ColoredFormatter
+
+# Tạo logger và cấu hình logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Tạo một StreamHandler để đẩy log message đến stdout
+console_handler = logging.StreamHandler()
+
+# Sử dụng ColoredFormatter để có log màu trên màn hình
+formatter = ColoredFormatter(
+    "%(log_color)s%(asctime)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    reset=True,
+    log_colors={
+        'DEBUG': 'white',
+        'INFO': 'green',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'white',
+    },
+    secondary_log_colors={},
+    style='%'
+)
+
+console_handler.setFormatter(formatter)
+
+# Thêm StreamHandler vào logger
+logger.addHandler(console_handler)
 
 queue_lock = threading.Lock()
 tool_lock = threading.Lock()
@@ -16,7 +46,6 @@ def search_key_word(queue_link,tool,max_size_post):
         with queue_lock:
             key_word_lists=local_device_config[0]['mode']['keyword']
             max_size_post= local_device_config[0]['mode']['max_size_post']
-            print(key_word_lists)
             with tool_lock:
                 try:
                         YoutubeCrawlerJob.get_link_search_key_word(
@@ -30,7 +59,6 @@ def search_key_word(queue_link,tool,max_size_post):
                         tool=tool,
                         max_size_post=max_size_post)
                 except Exception as e:
-                        print(e)
                         time.sleep(15*60)
                         continue
 def search_channel(queue_link,tool,list_channel,max_size_post):
@@ -44,7 +72,6 @@ def search_channel(queue_link,tool,list_channel,max_size_post):
                         max_size_post=max_size_post
                         )
                 except Exception as e:
-                    print(e)
                     time.sleep(15*60)
                     continue
 def crawl_videos(queue_link, tool,mode):
@@ -54,7 +81,7 @@ def crawl_videos(queue_link, tool,mode):
             if 'shorts'in link:
                 continue
         except queue.Empty:
-            print("Hàng đợi trống.")
+            logger.critical("Hàng đợi trống.")
             time.sleep(10)
             continue
 
@@ -268,7 +295,6 @@ def update(local_device_config):
     tool7 = YoutubeCrawlerTool(options_list=options_list,username=username, password=password) 
     crawl_thread7 = threading.Thread(target=crawl_videos, args=(queue_link_update, tool7,3))
     crawl_thread7.start()
-
     crawl_thread5.join()
     crawl_thread6.join()
     crawl_thread7.join()

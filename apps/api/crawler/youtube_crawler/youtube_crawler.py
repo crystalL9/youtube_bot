@@ -7,9 +7,39 @@ from .utils import (
     HomePageCrawler,
     YoutubeUtil,
     StringHandler,
-    GChromeDriver, InteractOption,
+    GChromeDriver
+)
+from call_api import get_links,insert
+import logging
+from colorlog import ColoredFormatter
+
+# Tạo logger và cấu hình logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Tạo một StreamHandler để đẩy log message đến stdout
+console_handler = logging.StreamHandler()
+
+# Sử dụng ColoredFormatter để có log màu trên màn hình
+formatter = ColoredFormatter(
+    "%(log_color)s%(asctime)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    reset=True,
+    log_colors={
+        'DEBUG': 'white',
+        'INFO': 'green',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'white',
+    },
+    secondary_log_colors={},
+    style='%'
 )
 
+console_handler.setFormatter(formatter)
+
+
+logger.addHandler(console_handler)
 YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com"
 BROWSER_LANGUAGE = "en"
 HASHTAG_SEARCH_URL = "https://www.youtube.com/hashtag"
@@ -30,7 +60,11 @@ class YoutubeCrawlerTool:
     # tab chrome để lấy link search theo keyword
     def get_link_search_key_word(self,sub_key_list,main_key_list,queue_link,max_size_post):
         while True:
-            crawled_video_links = self.read_file_lines('link_crawled/crawled.txt')
+            # lấy link đã crawl từ file local
+            #crawled_video_links = self.read_file_lines('link_crawled/crawled.txt')
+
+            # lấy link đã crawl từ db
+            crawled_video_links=get_links("youtube_video","crawled")['links']
             if sub_key_list!=None:
                 for mainkey in main_key_list:
                     for subkey in sub_key_list:
@@ -42,7 +76,7 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                print("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                logger.critical("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                 self.driver.get('about:blank')
                 time.sleep(3600*2)    
 
@@ -57,9 +91,9 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                    print("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                    logger.critical("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                     self.driver.get('about:blank')
-                    time.sleep(3600*2)
+                    time.sleep(3600*1)
             
     # tab chrome để lấy link search theo channel
     def get_link_search_channel(self,queue_link,list_link_channels,max_size_post):
@@ -67,7 +101,11 @@ class YoutubeCrawlerTool:
             for link_channel in list_link_channels:
                 id_channel=link_channel.split('/')[-1]
                 try:
-                    crawled_video_links = self.read_file_lines(f'link_crawled/{id_channel}.txt')
+                    # lấy link đã crawl từ file local
+                    #crawled_video_links = self.read_file_lines(f'link_crawled/{id_channel}.txt')
+
+                    # lấy link đã crawl từ db
+                    crawled_video_links=get_links('youtube_video',id_channel)['links']
                 except:
                     crawled_video_links = []
 
@@ -91,45 +129,9 @@ class YoutubeCrawlerTool:
                     time.sleep(3)
                 except:
                     pass
-            print("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
+            logger.critical("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
             self.driver.get('about:blank')
-            time.sleep(3600*2)
-            
-
-    # tab chrome để lấy link search theo channel (cho channel siêu nhiều video để demo :)))
-    def get_link_search_channel_long(self,queue_link,list_link_channels):
-        while True:
-            for link in list_link_channels:
-                id_channel=link.split('/')[-1]
-                try:
-                    crawled_video_links = self.read_file_lines(f'link_crawled/{id_channel}.txt')
-                except:
-                    crawled_video_links = []
-
-                try:
-                    self.driver.get(f'{link}/videos')
-                    time.sleep(3)
-                    video_links=self.extract_link_from_channel_long(crawled_link=crawled_video_links,queue_link=queue_link)
-                    if len(video_links)!=0:
-                        for link in reversed(video_links):
-                            queue_link.put(link)
-                    time.sleep(3)
-                except:
-                    pass
-                try:
-                    self.driver.get(f'{link}/streams')
-                    time.sleep(3)
-                    video_links=self.extract_link_from_channel_long(crawled_link=crawled_video_links,queue_link=queue_link)
-                    if len(video_links)!=0:
-                        for link in reversed(video_links):
-                            queue_link.put(link)
-                    time.sleep(3)
-                except:
-                    pass
-            print("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
-            self.driver.get('about:blank')
-            time.sleep(3600*2)
-   ######################################################################
+            time.sleep(3600*1)
 
    # Đọc file ra list
     def read_file_lines(self,file_path):
@@ -156,9 +158,8 @@ class YoutubeCrawlerTool:
         if sub_key_list!=None:
             for mainkey in main_key_list:
                 for subkey in sub_key_list:
-                    # split_mainkey= '""'.join(mainkey.split())
-                    # split_subkey= '""'.join(subkey.split())
                     crawled_video_links = self.read_file_lines('link_crawled/crawled.txt')
+
                     # kết quả tìm kiếm được sắp xếp theo ngày đăng
                     search_url = f'https://www.youtube.com/results?search_query="{mainkey}""{subkey}"&sp=CAI%253D'
                     self.driver.get(search_url)
@@ -258,51 +259,6 @@ class YoutubeCrawlerTool:
         with open(file_path, 'a') as file:
                 file.write(txt)
                 file.write('\n')
-    def crawl_information_video_2(self, interact_option, keyword, crawled_video_links, main_key, sub_key):
-        can_scroll = True
-        check = 0
-        while can_scroll:
-            if check != 0:
-                if len(video_links) == 0:
-                    can_scroll = False
-                    continue
-
-            video_links = self.extract_link_from_page(crawled_link=crawled_video_links)
-            if video_links is None:
-                video_links = []
-        
-            try:
-                for link in reversed(video_links.copy()):
-                    link_short=self.excute_link(link)
-                    if 'shorts' in link_short:
-                        if video_links is not None:
-                            video_links.remove(link)
-                        continue
-                    if link_short in crawled_video_links:
-                        if video_links is not None:
-                            video_links.remove(link)
-                        continue
-                    data = self.scrape_video_by_links(
-                        interact_option = interact_option,
-                        video_links = link_short,
-                        keyword = None,
-                        main_key= main_key,
-                        sub_key= sub_key
-                        )
-                    self.save_link(link_short,'link_crawled/crawled.txt')
-                    if video_links is not None:
-                        video_links.remove(link)
-            except Exception as e:
-                if video_links is not None:
-                    video_links.remove(link)
-                with open("error/error_link.txt", "a") as file:
-                    file.write(link)
-                    file.write('\n')
-                crawler_logger.error(str(e))
-
-            check += 1
-            time.sleep(5)
-        return crawled_video_links
     
 # 11/10/2023 update code mới 
     def _crawled_data_in_thumbnails_screen(self, interact_option,crawled_video_links,id_chanel):
@@ -428,7 +384,7 @@ class YoutubeCrawlerTool:
             if after_scroll_height == before_scroll_height:
                 return video_links
             if max_size_post > 0 :
-                if len(video_links) == int(max_size_post):
+                if len(video_links) >= int(max_size_post):
                     return video_links
                 else:
                     pass
@@ -472,7 +428,7 @@ class YoutubeCrawlerTool:
             if after_scroll_height == before_scroll_height:
                 return video_links
             if max_size_post > 0 :
-                if len(video_links) == int(max_size_post):
+                if len(video_links) >= int(max_size_post):
                     return video_links
                 else:
                     pass

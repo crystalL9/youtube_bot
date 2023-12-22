@@ -20,7 +20,37 @@ from apps.api.crawler.utils.crawler_logger import CrawlerLogger
 from .result import Post
 from jsonpath_ng import parse
 from selenium.webdriver.support.ui import WebDriverWait
+from call_api import get_links,insert
+import logging
+from colorlog import ColoredFormatter
 
+# Tạo logger và cấu hình logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Tạo một StreamHandler để đẩy log message đến stdout
+console_handler = logging.StreamHandler()
+
+# Sử dụng ColoredFormatter để có log màu trên màn hình
+formatter = ColoredFormatter(
+    "%(log_color)s%(asctime)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    reset=True,
+    log_colors={
+        'DEBUG': 'white',
+        'INFO': 'green',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'white',
+    },
+    secondary_log_colors={},
+    style='%'
+)
+
+console_handler.setFormatter(formatter)
+
+# Thêm StreamHandler vào logger
+logger.addHandler(console_handler)
 
 YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com"
 LOGIN_URL = (
@@ -184,7 +214,6 @@ class DetailCrawler:
             except: 
                 video_info["like"]=0
             video_info["avatar"]=self._extract_channel_avatar()
-            print('avatar:'+video_info["avatar"])
             try:
                 video_info["view"]=int(data["viewCount"])
             except:
@@ -202,8 +231,6 @@ class DetailCrawler:
                 video_info["comment"] = int(self.comment_validate(comment_element.text))
             except:
                 video_info["comment"]=0
-            print("=====⨳⨳⨳⨳⨳==== ")
-            print(type(video_info))
             return Post(**video_info)
         except Exception as e:
             print("Exception at extract_video_info_json(): ",e)
@@ -495,12 +522,12 @@ class DetailCrawler:
     #mode 2: channel
 
     def run(self, video_url, main_key, sub_key,mode):
-            print(f"»» Bắt đầu crawl link : {video_url}")
+            logger.warning(f"»» Bắt đầu crawl link : {video_url}")
             time.sleep(2)
             try:
                 self.driver.get(video_url)
                 time.sleep(4)
-                print(f"»»»»»» Crawl thông tin video có link là {video_url}")
+                logger.warning(f"»»»»»» Crawl thông tin video có link là {video_url}")
                 video_info=self.extract_video_info_json(main_key= main_key, sub_key=sub_key,mode=mode)
                 if video_info is None:
                     return None,[]
@@ -515,11 +542,22 @@ class DetailCrawler:
                     except Exception as e:
                         print(e)
                 if mode==1:
+
+                    # lưu link vào local
                     with open('link_crawled/crawled.txt', "a") as file:
                         file.write(f'{self.link_to_id(video_url)}\n')
+
+                    # lưu link vào db
+                    insert('youtube_video','crawled',self.link_to_id(video_url))
+
                 if mode==2:
+                    # lưu link vào local
                     with open(f'link_crawled/{str(video_info.author_link).split("/")[-1]}.txt', "a") as file:
                         file.write(f'{self.link_to_id(video_url)}\n')
+                    
+                    # lưu link vào db
+                    insert('youtube_video',str(video_info.author_link).split("/")[-1],self.link_to_id(video_url))
+
                 self.driver.get('about:blank')
                 return video_info, comments
             except Exception as e:
@@ -563,7 +601,7 @@ class DetailCrawler:
             if after_scroll_height == before_scroll_height:
                 break
     def get_comments_from_url(self,youtube_url,mode):
-        print(f'»»»»»» Crawl bình luận của video có link là {youtube_url}')
+        logger.warning(f'»»»»»» Crawl bình luận của video có link là {youtube_url}')
         link = self.driver.current_url
         video_id = self.extract_video_id(link)
         sort_by=SORT_BY_RECENT 
@@ -659,7 +697,7 @@ class DetailCrawler:
                 yield result
                 comments_data.append(result)
             if len(comments_data)>0:
-                print(f"⨝ Crawl được {len(comments_data)} bình luận")
+                logger.info(f"⨝ Crawl được {len(comments_data)} bình luận")
                 for comment in comments_data:
                     if int(mode)==3:
                         push_kafka_update(posts=[Post(**comment)],comments=None)
@@ -862,19 +900,10 @@ class GChromeDriver:
         options.add_experimental_option("detach", False)
         for option in options_list:
             options.add_argument(str(option))
-            # options.add_argument("--lang=en")
-            # options.add_argument("--mute-audio")
-            # options.add_argument("--disable-infobars")
-            # options.add_argument("--disable-popup-blocking")
-            # options.add_argument("--start-maximized")
-            # options.add_argument("--no-sandbox")
-            # options.add_argument('--disable-gpu')
-            # options.add_argument('--incognito')
-            # options.add_argument("--disable-extensions")
-            # options.add_argument('--disable-infobars')
-            # options.add_argument("--disable-dev-shm-usage")
-            # options.add_argument("--disable-blink-features=AutomationControlled")
-        driver = webdriver.Chrome(options=options,executable_path='chromedriver.exe')
+        try:
+            driver = webdriver.Chrome(options=options,executable_path='chromedriver.exe')
+        except:
+            driver = webdriver.Chrome(options=options)
         driver.maximize_window()
         if username and password:
             GChromeDriver.login(driver, username, password)
@@ -905,7 +934,7 @@ class GChromeDriver:
                 break  # Thoát khỏi vòng lặp nếu tìm thấy trường mật khẩu
             except TimeoutException:
                 attempts += 1
-                print("Không tìm thấy trường mật khẩu. Refresh lại trang...")
+                logger.error("Không tìm thấy trường mật khẩu. Refresh lại trang...")
                 driver.refresh()
         
         if password_field:
@@ -917,7 +946,7 @@ class GChromeDriver:
             password_next_button.click()
             time.sleep(5)
         else:
-            print("Không thể đăng nhập sau số lần thử tối đa.")
+            logger.error("Không thể đăng nhập sau số lần thử tối đa.")
 
     @classmethod
     def captcha_handle(cls, driver):
