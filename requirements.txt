@@ -14,3 +14,4 @@ requests
 jsonpath_ng
 elasticsearch
 colorlog
+schedule

@@ -49,7 +49,7 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                log_white("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                print("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                 self.driver.get('about:blank')
                 time.sleep(3600*2)    
 
@@ -64,7 +64,7 @@ class YoutubeCrawlerTool:
                         if len(video_links)!=0:
                             for link in reversed(video_links):
                                 queue_link.put(link)
-                    log_white("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
+                    print("******** Search hết bộ keyword, tạm dừng chờ video mới *********")
                     self.driver.get('about:blank')
                     time.sleep(3600*1)
             
@@ -102,7 +102,7 @@ class YoutubeCrawlerTool:
                     time.sleep(3)
                 except:
                     pass
-            log_white("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
+            print("******** Search hết các video hiện tại, tạm dừng chờ video mới *********")
             self.driver.get('about:blank')
             time.sleep(3600*1)
 
@@ -172,6 +172,24 @@ class YoutubeCrawlerTool:
                 main_key=main_key,
                 sub_key=sub_key,
                 mode=mode
+            )
+            if crawl_data:
+                video_detail, comments = crawl_data
+                crawled_data_list.append(video_detail)
+                crawled_data_list.extend(comments)
+        except Exception as e:
+            crawler_logger.error(str(e))
+        return crawled_data_list
+
+    def crawl_information_video_update(self,video_link, main_key, sub_key,mode,check):
+        crawled_data_list = []
+        try:
+            crawl_data = self.detail_crawler.run_update(
+                video_url=video_link,
+                main_key=main_key,
+                sub_key=sub_key,
+                mode=mode,
+                check=check
             )
             if crawl_data:
                 video_detail, comments = crawl_data
@@ -458,6 +476,10 @@ class YoutubeCrawlerJob:
     @staticmethod
     def crawl_information_video(sub_key,main_key,link,tool,mode):
         tool.crawl_information_video(video_link=link, main_key=main_key, sub_key=sub_key,mode=mode)
+        tool.driver.get('about:blank')
+    @staticmethod
+    def crawl_information_video_update(sub_key,main_key,link,tool,mode,check):
+        tool.crawl_information_video_update(video_link=link, main_key=main_key, sub_key=sub_key,mode=mode,check=check)
         tool.driver.get('about:blank')
     
     @staticmethod

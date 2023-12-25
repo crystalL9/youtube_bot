@@ -60,9 +60,11 @@
         ],
         "mode":
 		{
-			"id" : 2,
+			"id" : 3,
 			"name" : "channel",
             "time_expired": null,
+            "start_time_run":"01:00:00",
+            "range_date": [2,7],
 			"keyword": [
                 "Tr\u1ecdng l\u00fa",
                 "Nguy\u1ec5n Ph\u00fa Tr\u1ecdng",

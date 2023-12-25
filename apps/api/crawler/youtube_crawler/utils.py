@@ -21,7 +21,7 @@ from .result import Post
 from jsonpath_ng import parse
 from selenium.webdriver.support.ui import WebDriverWait
 from call_api import get_links,insert
-from logger import *
+from logger import Colorlog
 
 YOUTUBE_HOMEPAGE_URL = "https://www.youtube.com"
 LOGIN_URL = (
@@ -493,12 +493,12 @@ class DetailCrawler:
     #mode 2: channel
 
     def run(self, video_url, main_key, sub_key,mode):
-            log_yellow(f"»» Bắt đầu crawl link : {video_url}")
+            print(f"{Colorlog.green_color}{datetime.datetime.now()} »» Bắt đầu crawl link : {video_url}{Colorlog.reset_color}")
             time.sleep(2)
             try:
                 self.driver.get(video_url)
                 time.sleep(4)
-                log_yellow(f"»»»»»» Crawl thông tin video có link là {video_url}")
+                print(f"{Colorlog.green_color}{datetime.datetime.now()} »» »»»»»» Crawl thông tin video có link là : {video_url}{Colorlog.reset_color}")
                 video_info=self.extract_video_info_json(main_key= main_key, sub_key=sub_key,mode=mode)
                 if video_info is None:
                     return None,[]
@@ -546,6 +546,61 @@ class DetailCrawler:
                 return None,[]
                 crawler_logger.error(str(e) + link)
     
+    def run_update(self, video_url, main_key, sub_key,mode,check):
+            if check==True:
+                print(f"{Colorlog.green_color}{datetime.datetime.now()} »» Bắt đầu crawl link : : {video_url}{Colorlog.reset_color}")
+                time.sleep(2)
+                try:
+                    self.driver.get(video_url)
+                    time.sleep(4)
+                    print(f"{Colorlog.green_color}{datetime.datetime.now()} »» Crawl thông tin video có link là: {video_url}{Colorlog.reset_color}")
+                    video_info=self.extract_video_info_json(main_key= main_key, sub_key=sub_key,mode=mode)
+                    if video_info is None:
+                        return None,[]
+                    if int(mode)==3:
+                        push_kafka_update(posts=[video_info],comments=None)
+                    else:
+                        push_kafka(posts=[video_info],comments=None)
+                    comments=[]
+                    if video_info.comment > 0 :
+                        try:
+                            comments= self.get_comments_from_url(youtube_url=video_url,mode=mode)
+                        except Exception as e:
+                            print(e)
+                    if mode==1:
+
+                        # lưu link vào local
+                        with open('link_crawled/crawled.txt', "a") as file:
+                            file.write(f'{self.link_to_id(video_url)}\n')
+
+                        # lưu link vào db
+                        #insert('youtube_video','crawled',self.link_to_id(video_url))
+
+                    if mode==2:
+                        # lưu link vào local
+                        with open(f'link_crawled/{str(video_info.author_link).split("/")[-1]}.txt', "a") as file:
+                            file.write(f'{self.link_to_id(video_url)}\n')
+                        
+                        # lưu link vào db
+                        #insert('youtube_video',str(video_info.author_link).split("/")[-1],self.link_to_id(video_url))
+
+                    self.driver.get('about:blank')
+                    return video_info, comments
+                except Exception as e:
+                    print(e)
+                    if mode ==1:
+                        with open(f'error/error_link.txt.txt', "a") as file:
+                            file.write(self.link_to_id(video_url))
+                            file.write('\n')
+                    if mode ==2:
+                        with open(f'error/{str(video_info.author_link).split("/")[-1]}_error.txt', "a") as file:
+                            file.write(self.link_to_id(video_url))
+                            file.write('\n')
+                    self.driver.get('about:blank')
+                    #self.driver.switch_to.window(self.driver.window_handles[1])
+                    return None,[]
+            else:
+                self.driver.get('about:blank')
 
     def ajax_request(self, endpoint, ytcfg, retries=5, sleep=20):
         url = 'https://www.youtube.com' + endpoint['commandMetadata']['webCommandMetadata']['apiUrl']
@@ -572,7 +627,7 @@ class DetailCrawler:
             if after_scroll_height == before_scroll_height:
                 break
     def get_comments_from_url(self,youtube_url,mode):
-        log_yellow(f'»»»»»» Crawl bình luận của video có link là {youtube_url}')
+        print(f"{Colorlog.green_color}{datetime.datetime.now()} »» Crawl bình luận của video: {youtube_url}{Colorlog.reset_color}")
         link = self.driver.current_url
         video_id = self.extract_video_id(link)
         sort_by=SORT_BY_RECENT 
@@ -668,7 +723,7 @@ class DetailCrawler:
                 yield result
                 comments_data.append(result)
             if len(comments_data)>0:
-                log_green(f"⨝ Crawl được {len(comments_data)} bình luận")
+                print(f"{Colorlog.green_color}{datetime.datetime.now()} »» ⨝ Đã crawl được {len(comments_data)} bình luận{Colorlog.reset_color}")
                 for comment in comments_data:
                     if int(mode)==3:
                         push_kafka_update(posts=[Post(**comment)],comments=None)
@@ -905,7 +960,7 @@ class GChromeDriver:
                 break  # Thoát khỏi vòng lặp nếu tìm thấy trường mật khẩu
             except TimeoutException:
                 attempts += 1
-                log_red("Không tìm thấy trường mật khẩu. Refresh lại trang...")
+                print(f"{Colorlog.red_color}{datetime.datetime.now()} Không tìm thấy trường mật khẩu. Refresh lại trang...{Colorlog.reset_color}")
                 driver.refresh()
         
         if password_field:
@@ -917,7 +972,7 @@ class GChromeDriver:
             password_next_button.click()
             time.sleep(5)
         else:
-            log_red("Không thể đăng nhập sau số lần thử tối đa.")
+            print(f"{Colorlog.red_color}{datetime.datetime.now()} Cố gắng đăng nhập thất bại{Colorlog.reset_color}")
 
     @classmethod
     def captcha_handle(cls, driver):

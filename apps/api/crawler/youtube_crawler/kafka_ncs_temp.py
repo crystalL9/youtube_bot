@@ -1,7 +1,8 @@
 import pickle
 
 from kafka import KafkaProducer
-from logger import *
+from logger import Colorlog
+import datetime
 producer = KafkaProducer(bootstrap_servers=["192.168.143.54:9092"])
 
 
@@ -9,7 +10,7 @@ def push_kafka(posts, comments):
     if posts:
         bytes_obj = pickle.dumps([ob.__dict__ for ob in posts])
         producer.send('lnmxh', bytes_obj)
-        log_green("======> Đẩy 1 bài qua kafka")
+        print(f"{Colorlog.yellow_color}{datetime.datetime.now()} »» Đã 1 object đẩy vào kafka {Colorlog.reset_color}")
         return 1
     else:
         return 0
@@ -17,7 +18,7 @@ def push_kafka_update(posts, comments):
     if posts:
         bytes_obj = pickle.dumps([ob.__dict__ for ob in posts])
         producer.send('osint-posts-update', bytes_obj)
-        log_green("======> Đẩy 1 bài update qua kafka")
+        print(f"{Colorlog.yellow_color}{datetime.datetime.now()} »» Đã 1 object update đẩy vào kafka {Colorlog.reset_color}")
         return 1
     else:
         return 0

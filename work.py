@@ -5,8 +5,9 @@ import queue
 from apps.api.crawler.youtube_crawler.youtube_crawler import YoutubeCrawlerTool
 from apps.api.crawler.youtube_crawler.youtube_crawler import YoutubeCrawlerJob
 from elasticsearch import Elasticsearch
-from datetime import datetime, timedelta
-from logger import *
+from datetime import timedelta,datetime
+import datetime as dt
+from logger import Colorlog
 
 queue_lock = threading.Lock()
 tool_lock = threading.Lock()
@@ -72,6 +73,42 @@ def crawl_videos(queue_link, tool,mode):
         finally:
             queue_link.task_done()
 
+def crawl_videos_update(queue_link, tool,mode,time_start_upate):
+    check = False
+    while True:
+        print(f'Chờ đến  {time_start_upate} để thực hiện cập nhật')
+        start_time = datetime.datetime.strptime(time_start_upate, "%H:%M:%S")
+        end_time = start_time - datetime.timedelta(minutes=5)
+        current_time = dt.datetime.now().strftime("%H:%M:%S")
+        if current_time >= end_time and current_time < time_start_upate:
+            check = False
+        if current_time==time_start_upate:
+            print(f'Bắt đầu thực hiện cập nhật')
+            check=True
+        try:
+            link = queue_link.get(timeout=10)
+            if 'shorts'in link:
+                continue
+        except queue.Empty:
+            time.sleep(10)
+            continue
+
+        # 28/09/2023: Tìm kiếm và crawl video theo key chính và key phụ
+        try:
+            YoutubeCrawlerJob.crawl_information_video_update(
+                main_key=None,
+                sub_key=None,
+                link=link,
+                tool=tool,
+                mode=mode,
+                check=check
+            )
+        except Exception as e:
+            print(e)
+            time.sleep(15*60)
+            continue
+        finally:
+            queue_link.task_done()
 def read_lines_from_file(url,mode):
     if mode ==1:
         try:
@@ -179,7 +216,7 @@ def work1(local_device_config):
             time.sleep(4)
             continue
 def get_link(queue_link,gte,lte):
-    es = Elasticsearch(["http://10.11.101.129:9200"])
+    es = Elasticsearch(["http://192.168.143.54:9200"])
     body1 = {
             "query": {
                 "bool": {
@@ -226,33 +263,49 @@ def get_link(queue_link,gte,lte):
             queue_link.put(item["_source"]["link"])
     es.close()
    
-def get_link_es(queue):
-
+def get_link_es(queue,time_start_upate,range_date):
     while True:
-        current_date = datetime.now()
-        one_day_ago = current_date - timedelta(days=1)
-        formatted_date = current_date.strftime("%Y/%m/%d")
-        one_day_ago_formatted_date=one_day_ago.strftime("%Y/%m/%d")
-        six_day_ago = current_date - timedelta(days=6)
-        seven_day_ago = current_date - timedelta(days=7)
-        six_day_ago_formatted_date=six_day_ago.strftime("%Y/%m/%d")
-        seven_day_ago_formatted_date=seven_day_ago.strftime("%Y/%m/%d")
-        print(f"💻💻💻 Bắt đầu lấy link của ngày {one_day_ago_formatted_date} và ngày {seven_day_ago_formatted_date}")
-        gte=f'{one_day_ago_formatted_date} 00:00:00'
-        lte=f'{formatted_date} 00:00:00'
-        get_link(queue_link=queue,gte=gte,lte=lte)
-        time.sleep(30)
-        gte=f'{seven_day_ago_formatted_date} 00:00:00'
-        lte=f'{six_day_ago_formatted_date} 00:00:00'
-        get_link(queue_link=queue,gte=gte,lte=lte)
-        print(f" ☑ ☑ ☑ Đã lấy hết link của ngày {one_day_ago_formatted_date} và ngày {seven_day_ago_formatted_date} ")
-        time.sleep(24*3600)
+
+        current_time = dt.datetime.now().strftime("%H:%M:%S")
+        if current_time == time_start_upate:
+            queue.queue.clear()
+            print(f' Thời gian hiện tại là  {time_start_upate}. Bắt đầu thực hiện cập nhật')    
+            current_date = datetime.now()
+            one_day_ago = current_date - timedelta(days=int(range_date[0]))
+            formatted_date = current_date.strftime("%Y/%m/%d")
+            one_day_ago_formatted_date=one_day_ago.strftime("%Y/%m/%d")
+            six_day_ago = current_date - timedelta(days=int(range_date[1]-1))
+            seven_day_ago = current_date - timedelta(days=int(range_date[1]))
+            six_day_ago_formatted_date=six_day_ago.strftime("%Y/%m/%d")
+            seven_day_ago_formatted_date=seven_day_ago.strftime("%Y/%m/%d")
+            print(f"💻💻💻 Bắt đầu lấy link của ngày {one_day_ago_formatted_date} và ngày {seven_day_ago_formatted_date}")
+            gte=f'{one_day_ago_formatted_date} 00:00:00'
+            lte=f'{formatted_date} 00:00:00'
+            try:
+                get_link(queue_link=queue,gte=gte,lte=lte)
+            except:
+                pass
+            time.sleep(30)
+            gte=f'{seven_day_ago_formatted_date} 00:00:00'
+            lte=f'{six_day_ago_formatted_date} 00:00:00'
+            try:
+                get_link(queue_link=queue,gte=gte,lte=lte)
+            except:
+                pass
+            print(f" ☑ ☑ ☑ Đã lấy hết link của ngày {one_day_ago_formatted_date} và ngày {seven_day_ago_formatted_date} ")
+        else:
+            yellow_color = "\033[93m"
+            reset_color = "\033[0m"
+            print(f'{yellow_color}{dt.datetime.now()} *** UPDATE TOOL : Chờ đến  {time_start_upate} để bắt đầu thực hiện cập nhật{reset_color}')
+            continue
 
 def update(local_device_config):
     options_list=local_device_config[0]['listArgument']
+    time_start_upate=local_device_config[0]['mode']['start_time_run']
+    range_date=local_device_config[0]['mode']['range_date']
     queue_link_update = queue.Queue()
 
-    crawl_thread5 = threading.Thread(target=get_link_es, args=(queue_link_update,))
+    crawl_thread5 = threading.Thread(target=get_link_es, args=(queue_link_update,time_start_upate,range_date))
     crawl_thread5.start()
     # username = local_device_config[0]['account']['username']
     # password = local_device_config[0]['account']['password']
@@ -260,15 +313,16 @@ def update(local_device_config):
     password = None
 
     tool6 = YoutubeCrawlerTool(options_list=options_list,username=username, password=password) 
-    crawl_thread6 = threading.Thread(target=crawl_videos, args=(queue_link_update, tool6,3))
+    crawl_thread6 = threading.Thread(target=crawl_videos_update, args=(queue_link_update, tool6,3,time_start_upate))
     crawl_thread6.start()
 
     tool7 = YoutubeCrawlerTool(options_list=options_list,username=username, password=password) 
-    crawl_thread7 = threading.Thread(target=crawl_videos, args=(queue_link_update, tool7,3))
+    crawl_thread7 = threading.Thread(target=crawl_videos_update, args=(queue_link_update, tool7,3,time_start_upate))
     crawl_thread7.start()
     crawl_thread5.join()
     crawl_thread6.join()
     crawl_thread7.join()
+
 def test(local_device_config):   
         try:
             # username = local_device_config[0]['account']['username']

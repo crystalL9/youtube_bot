@@ -1,40 +1,6 @@
-import logging
-from colorlog import ColoredFormatter
-
-# Tạo logger và cấu hình logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# Tạo một StreamHandler để đẩy log message đến stdout
-console_handler = logging.StreamHandler()
-
-# Sử dụng ColoredFormatter để có log màu trên màn hình
-formatter = ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    reset=True,
-    log_colors={
-        'DEBUG': 'white',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'white',
-    },
-    secondary_log_colors={},
-    style='%'
-)
-
-console_handler.setFormatter(formatter)
-
-# Thêm StreamHandler vào logger
-logger.addHandler(console_handler)
-
-def log_green(txt):
-    logger.info(txt)
-def log_yellow(txt):
-    logger.warning(txt)
-def log_red(txt):
-    logger.error(txt)
-def log_white(txt):
-    logger.critical(txt)
-
+class Colorlog:
+    red_color = "\033[91m"
+    green_color = "\033[92m"
+    reset_color = "\033[0m"
+    yellow_color = "\033[93m"
+    green_blue_color = "\033[96m" 
